@@ -1,20 +1,24 @@
 // DEPENDENCIES
 const events = require('express').Router()
 const db = require('../models')
-const { Events } = db 
+const { Event, Meet_greet, set_time, stage } = db 
+const { Op } = require('sequelize')
 
 //ENDPOINTS
 
 
-// FIND ALL events
+// FIND ALL EVENTS
 events.get('/', async (req, res) => {
     try {
-        const foundevents = await Events.findAll({ 
+        const foundEvents = await Event.findAll({
             order: [ [ 'date', 'ASC' ] ],
-            where:{ name: {[Op.like] : `%${req.query.name ? req.query.name :''}%`} }
+            where: {
+               name: { [Op.like]: `%${req.query.name ? req.query.name : ''}%` }
+            }
         })
-        res.status(200).json(foundevents)
+        res.status(200).json(foundEvents)
     } catch (error) {
+        console.log(error)
         res.status(500).json(error)
     }
 })
@@ -22,14 +26,44 @@ events.get('/', async (req, res) => {
 
 
 // FIND A SPECIFIC Event
-events.get('/:id', async (req, res) => {
+events.get('/:name', async (req, res) => {
     try {
-        const foundevents = await Events.findOne({
-            where: { event_id: req.params.id }
+        const foundEvent = await Event.findOne({
+            where: { name: req.params.name },
+            include: [
+                {
+                    model: Meet_greet,
+                    as: 'meet_greets',
+                    include: {
+                        model: Band,
+                        as: 'band'
+                    }
+                },
+                {
+                    model: set_time,
+                    as: 'set_times',
+                    include: [
+                        {
+                            model: Band,
+                            as: 'band'
+                        },
+                        {
+                            model: stage,
+                            as: 'stage'
+                        }
+                    ]
+                },
+                {
+                    model: stage,
+                    as: 'stages',
+                    through:  { attributes: [] }
+                }
+            ]
         })
-        res.status(200).json(foundevents)
+        res.status(200).json(foundEvent)
     } catch (error) {
-        res.status(500).json('error')
+        console.log(error)
+        res.status(500).json(error)
     }
 })
 

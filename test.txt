@@ -1,0 +1,849 @@
+// DEPENDENCIES
+const bands = require('express').Router()
+const db = require('../models')
+const { Band, MeetGreet, Event, SetTime } = db
+const { Op } = require('sequelize')
+
+// ENDPOINTS
+bands.get('/', async (req, res) => {
+    try {
+        const foundBands = await Band.findAll({
+            order: [ ['available_start_time', 'ASC'] ],
+            where: { name: { [Op.like]: `%${req.query.name ? req.query.name : ''}%` } },
+        })
+        res.status(200).json(foundBands)
+    } catch(err) {
+        console.log(err)
+        res.status(500).send('ERROR GETTING ALL BANDS')
+    }
+})
+
+bands.get('/:name', async (req, res) => {
+    try {
+        const foundBand = await Band.findOne({
+            where: {name: req.params.name},
+            include: [
+                {
+                    model: MeetGreet,
+                    as: 'meet_greets',
+                    include: {
+                        model: Event,
+                        as: 'event',
+                        where: { name: { [Op.like]: `%${req.query.event ? req.query.event : ''}%` } }
+                    }
+                }, {
+                    model: SetTime,
+                    as: 'set_times',
+                    include: {
+                        model: Event,
+                        as: 'event',
+                        where: { name: { [Op.like]: `%${req.query.event ? req.query.event : ''}%` } }
+                    }
+                }
+            ]
+        })
+        res.status(200).json(foundBand)
+    } catch(err) {
+        console.log(err)
+        res.status(500).send('ERROR GETTING ONE BAND')
+    }
+})
+
+bands.post('/', async (req, res) => {
+    try {
+        const newBand = await Band.create(req.body)
+        res.status(200).json({message: "Created a new band!", data: newBand})
+    } catch(err) {
+        console.log(err)
+        res.status(500).send('ERROR CREATING BAND')
+    }
+})
+
+bands.put('/:id', async (req, res) => {
+    try {
+        const updatedBands = await Band.update(
+            req.body,
+            { where: {band_id: req.params.id} }
+        )
+        res.status(200).json({ message: `Updated ${updatedBands} bands!`})
+    } catch(err) {
+        console.log(err)
+        res.status(500).send('ERROR UPDATING BANDS')
+    }
+})
+
+bands.delete('/:id', async (req, res) => {
+    try {
+        const deletedBand = await Band.destroy({ where: {band_id: req.params.id} })
+        res.status(200).json({ message: `Successfully deleted band id ${req.params.id}!`})
+    } catch(err) {
+        console.log(err)
+        res.status(500).send('ERROR DELETING BAND')
+    }
+})
+
+// EXPORT
+module.exports = bands
+
+
+events controller
+
+// DEPENDENCIES
+const events = require('express').Router()
+const db = require('../models')
+const { Event, MeetGreet, SetTime, Band, Stage, StageEvent } = db
+const { Op } = require('sequelize')
+
+// FIND ALL EVENTS
+events.get('/', async (req, res) => {
+    try {
+        const foundEvents = await Event.findAll({
+            order: [ [ 'date', 'ASC' ] ],
+            where: {
+                name: { [Op.like]: `%${req.query.name ? req.query.name : ''}%` }
+            }
+        })
+        res.status(200).json(foundEvents)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+    }
+})
+
+// FIND A SPECIFIC EVENT
+events.get('/:name', async (req, res) => {
+    try {
+        const foundEvent = await Event.findOne({
+            where: { name: req.params.name },
+            include: [
+                {
+                    model: MeetGreet,
+                    as: 'meet_greets',
+                    include: {
+                        model: Band,
+                        as: 'band'
+                    }
+                },
+                {
+                    model: SetTime,
+                    as: 'set_times',
+                    include: [
+                        {
+                            model: Band,
+                            as: 'band'
+                        },
+                        {
+                            model: Stage,
+                            as: 'stage'
+                        }
+                    ]
+                },
+                {
+                    model: Stage,
+                    as: 'stages',
+                    through:  { attributes: [] }
+                }
+            ]
+        })
+        res.status(200).json(foundEvent)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+    }
+})
+
+// CREATE AN EVENT
+events.post('/', async (req, res) => {
+    try {
+        const newEvent = await Event.create(req.body)
+        res.status(200).json({
+            message: 'Successfully inserted a new event',
+            data: newEvent
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// UPDATE AN EVENT
+events.put('/:id', async (req, res) => {
+    try {
+        const updatedEvents = await Event.update(req.body, {
+            where: {
+                event_id: req.params.id
+            }
+        })
+        res.status(200).json({
+            message: `Successfully updated ${updatedEvents} event(s)`
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// DELETE AN EVENT
+events.delete('/:id', async (req, res) => {
+    try {
+        const deletedEvents = await Event.destroy({
+            where: {
+                event_id: req.params.id
+            }
+        })
+        res.status(200).json({
+            message: `Successfully deleted ${deletedEvents} event(s)`
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// EXPORT
+module.exports = events
+
+stages controller
+// DEPENDENCIES
+const stages = require('express').Router()
+const db = require('../models')
+const { Stage, Event, StageEvent } = db 
+const { Op } = require('sequelize')
+
+// FIND ALL STAGES
+stages.get('/', async (req, res) => {
+    try {
+        const foundStages = await Stage.findAll({
+            where: {
+                stage_name: { [Op.like]: `%${req.query.stage_name ? req.query.stage_name : ''}%` }
+            }
+        })
+        res.status(200).json(foundStages)
+    } catch (error) {
+        res.status(500).json(error)
+    }
+})
+
+// FIND A SPECIFIC STAGE
+stages.get('/:name', async (req, res) => {
+    try {
+        const foundStage = await Stage.findOne({
+            where: { stage_name: req.params.name },
+            include: {
+                model: Event,
+                as: 'events',
+                through: { attributes: [] }
+            }
+        })
+        res.status(200).json(foundStage)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+    }
+})
+
+// CREATE A STAGE
+stages.post('/', async (req, res) => {
+    try {
+        const newStage = await Stage.create(req.body)
+        res.status(200).json({
+            message: 'Successfully inserted a new stage',
+            data: newStage
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// UPDATE A STAGE
+stages.put('/:id', async (req, res) => {
+    try {
+        const updatedStages = await Stage.update(req.body, {
+            where: {
+                stage_id: req.params.id
+            }
+        })
+        res.status(200).json({
+            message: `Successfully updated ${updatedStages} stage(s)`
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// DELETE A STAGE
+stages.delete('/:id', async (req, res) => {
+    try {
+        const deletedStages = await Stage.destroy({
+            where: {
+                stage_id: req.params.id
+            }
+        })
+        res.status(200).json({
+            message: `Successfully deleted ${deletedStages} stage(s)`
+        })
+    } catch(err) {
+        res.status(500).json(err)
+    }
+})
+
+// EXPORT
+module.exports = stages
+
+migrations
+'use strict'
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('event', {
+      event_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      date: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      start_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      end_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      }
+    })
+  },
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('event')
+  }
+}
+
+'use strict'
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('stage', {
+      stage_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      stage_name: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      }
+    })
+  },
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('stage')
+  }
+}
+
+'use strict'
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('stage_event', {
+      stage_events_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      stage_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      event_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      }
+    })
+  },
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('stage_event')
+  }
+}
+
+'use strict'
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('set_time', {
+      set_time_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      event_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      stage_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      band_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      start_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      end_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      }
+    })
+  },
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('set_time')
+  }
+}
+
+'use strict'
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    await queryInterface.createTable('meet_greet', {
+      meet_greet_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      event_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      band_id: {
+        type: Sequelize.SMALLINT,
+        allowNull: false
+      },
+      meet_start_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      meet_end_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      }
+    })
+  },
+  down: async (queryInterface, Sequelize) => {
+    await queryInterface.dropTable('meet_greet')
+  }
+}
+
+'use strict';
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.createTable('band', {
+      band_id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      genre: {
+        type: Sequelize.TEXT,
+        allowNull: false
+      },
+      available_start_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      },
+      end_time: {
+        type: Sequelize.DATE,
+        allowNull: false
+      }
+    });
+  },
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('band');
+  }
+};
+
+models
+'use strict';
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class Band extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({ MeetGreet, SetTime }) {
+      Band.hasMany(MeetGreet, {
+        foreignKey: 'band_id',
+        as: "meet_greets"
+      })
+      Band.hasMany(SetTime, {
+        foreignKey: 'band_id',
+        as: 'set_times'
+      })
+    }
+  }
+  Band.init({
+    band_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    genre: {
+        type: DataTypes.TEXT,
+        allowNull: false
+    },
+    available_start_time: {
+        type: DataTypes.DATE,
+        allowNull: false
+    },
+    end_time: {
+        type: DataTypes.DATE,
+        allowNull: false
+    }
+  }, {
+    sequelize,
+    modelName: 'Band',
+    tableName: 'band',
+    timestamps: false
+  })
+  return Band;
+};
+
+'use strict'
+const {
+  Model
+} = require('sequelize')
+module.exports = (sequelize, DataTypes) => {
+  class Event extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({ Stage, StageEvent, MeetGreet, SetTime }) {
+      Event.belongsToMany(Stage, {
+        foreignKey: 'event_id',
+        as: 'stages',
+        through: StageEvent
+      })
+      Event.hasMany(MeetGreet, {
+        foreignKey: 'event_id',
+        as: 'meet_greets'
+      })
+      Event.hasMany(SetTime, {
+        foreignKey: 'event_id',
+        as: 'set_times'
+      })
+    }
+  }
+  Event.init({
+    event_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    date: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    start_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    end_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    }
+  }, {
+    sequelize,
+    modelName: 'Event',
+    tableName: 'event',
+    timestamps: false
+  })
+  return Event
+}
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const Sequelize = require('sequelize');
+const basename = path.basename(__filename);
+const env = process.env.NODE_ENV || 'development';
+const config = require(__dirname + '/../config/config.json')[env];
+const db = {};
+
+let sequelize;
+if (config.use_env_variable) {
+  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+} else {
+  sequelize = new Sequelize(config.database, config.username, config.password, config);
+}
+
+fs
+  .readdirSync(__dirname)
+  .filter(file => {
+    return (file.indexOf('.') !== 0) && (file !== basename) && (file.slice(-3) === '.js');
+  })
+  .forEach(file => {
+    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    db[model.name] = model;
+  });
+
+Object.keys(db).forEach(modelName => {
+  if (db[modelName].associate) {
+    db[modelName].associate(db);
+  }
+});
+
+db.sequelize = sequelize;
+db.Sequelize = Sequelize;
+
+module.exports = db;
+
+'use strict'
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class MeetGreet extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({ Band, Event }) {
+      MeetGreet.belongsTo(Band, {
+        foreignKey: 'band_id',
+        as: 'band'
+      })
+      MeetGreet.belongsTo(Event, {
+        foreignKey: 'event_id',
+        as: 'event'
+      })
+    }
+  }
+  MeetGreet.init({
+    meet_greet_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    event_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    band_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    meet_start_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    meet_end_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    }
+  }, {
+    sequelize,
+    modelName: 'MeetGreet',
+    tableName: 'meet_greet',
+    timestamps: false
+  })
+  return MeetGreet
+}
+
+'use strict'
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class SetTime extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({ Band, Event, Stage }) {
+      SetTime.belongsTo(Band, {
+        foreignKey: 'band_id',
+        as: 'band'
+      })
+      SetTime.belongsTo(Event, {
+        foreignKey: 'event_id',
+        as: 'event'
+      })
+      SetTime.belongsTo(Stage, {
+        foreignKey: 'stage_id',
+        as: 'stage'
+      })
+    }
+  };
+  SetTime.init({
+    set_time_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    event_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    stage_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    band_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    start_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+    end_time: {
+      type: DataTypes.DATE,
+      allowNull: false
+    },
+  }, {
+    sequelize,
+    modelName: 'SetTime',
+    tableName: 'set_time',
+    timestamps: false
+  })
+  return SetTime
+}
+
+'use strict'
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class Stage extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({ Event, StageEvent, SetTime }) {
+      Stage.belongsToMany(Event, {
+        foreignKey: 'event_id',
+        as: 'events',
+        through: StageEvent
+      })
+      Stage.hasMany(SetTime, {
+        foreignKey: 'stage_id',
+        as: 'set_times'
+      })
+    }
+  }
+  Stage.init({
+    stage_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    stage_name: {
+      type: DataTypes.STRING,
+      allowNull: false
+    }
+  }, {
+    sequelize,
+    modelName: 'Stage',
+    tableName: 'stage',
+    timestamps: false
+  })
+  return Stage
+}
+
+'use strict'
+const {
+  Model
+} = require('sequelize')
+module.exports = (sequelize, DataTypes) => {
+  class StageEvent extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate(models) {
+      // define association here
+    }
+  };
+  StageEvent.init({
+    stage_events_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    stage_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    },
+    event_id: {
+      type: DataTypes.SMALLINT,
+      allowNull: false
+    }
+  }, {
+    sequelize,
+    modelName: 'StageEvent',
+    tableName: 'stage_event',
+    timestamps: false,
+  })
+  return StageEvent
+}
+
+Server.js
+
+// DEPENDENCIES
+const express = require('express')
+const app = express()
+const { Sequelize } = require('sequelize')
+
+// CONFIGURATION / MIDDLEWARE
+require('dotenv').config()
+app.use(express.json())
+app.use(express.urlencoded({ extended: false }))
+
+// ROOT
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: 'Welcome to the Tour API'
+    })
+})
+
+// CONTROLLERS
+const bandsController = require('./controllers/bands_controller')
+app.use('/bands', bandsController)
+
+const eventsController = require('./controllers/events_controller')
+app.use('/events', eventsController)
+
+const stagesController = require('./controllers/stages_controller')
+app.use('/stages', stagesController)
+
+// LISTEN
+app.listen(process.env.PORT, () => {
+    console.log(`🎸 Rockin' on port: ${process.env.PORT}`)
+})
